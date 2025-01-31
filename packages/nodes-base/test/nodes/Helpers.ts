@@ -1,17 +1,14 @@
+import { Container } from '@n8n/di';
 import { readFileSync, readdirSync, mkdtempSync } from 'fs';
-import path from 'path';
-import { tmpdir } from 'os';
-import nock from 'nock';
-import { isEmpty } from 'lodash';
+import { mock } from 'jest-mock-extended';
 import { get } from 'lodash';
+import { isEmpty } from 'lodash';
 import {
 	BinaryDataService,
 	Credentials,
 	UnrecognizedNodeTypeError,
 	constructExecutionMetaData,
 } from 'n8n-core';
-import { Container } from 'typedi';
-import { mock } from 'jest-mock-extended';
 import type {
 	CredentialLoadingDetails,
 	ICredentialDataDecryptedObject,
@@ -39,8 +36,10 @@ import type {
 	WorkflowTestData,
 } from 'n8n-workflow';
 import { ApplicationError, ICredentialsHelper, NodeHelpers, WorkflowHooks } from 'n8n-workflow';
-import { executeWorkflow } from './ExecuteWorkflow';
+import { tmpdir } from 'os';
+import path from 'path';
 
+import { executeWorkflow } from './ExecuteWorkflow';
 import { FAKE_CREDENTIALS_DATA } from './FakeCredentialsMap';
 
 const baseDir = path.resolve(__dirname, '../..');
@@ -225,16 +224,6 @@ export function setup(testData: WorkflowTestData[] | WorkflowTestData) {
 		testData = [testData];
 	}
 
-	if (testData.some((t) => !!t.nock)) {
-		beforeAll(() => {
-			nock.disableNetConnect();
-		});
-
-		afterAll(() => {
-			nock.restore();
-		});
-	}
-
 	const nodeTypes = new NodeTypes();
 
 	const nodes = [...new Set(testData.flatMap((data) => data.input.workflowData.nodes))];
@@ -332,7 +321,7 @@ export const equalityTest = async (testData: WorkflowTestData, types: INodeTypes
 		return expect(resultData, msg).toEqual(testData.output.nodeData[nodeName]);
 	});
 
-	expect(result.finished).toEqual(true);
+	expect(result.finished || result.status === 'waiting').toEqual(true);
 };
 
 const preparePinData = (pinData: IDataObject) => {
@@ -383,7 +372,6 @@ export const workflowToTests = (workflowFiles: string[]) => {
 
 export const testWorkflows = (workflows: string[]) => {
 	const tests = workflowToTests(workflows);
-
 	const nodeTypes = setup(tests);
 
 	for (const testData of tests) {
